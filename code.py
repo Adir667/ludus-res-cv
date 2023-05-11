@@ -6,20 +6,35 @@ from pathlib import Path
 import numpy as np
 
 # Load YOLOv5 model
-model = torch.hub.load('ultralytics/yolov5', 'custom', path='best_trigger.pt')
+model = torch.hub.load('ultralytics/yolov5', 'custom', path='../models/best_trigger.pt')
 
 # Set device to GPU if available
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 model.to(device)
 
 def box_is_within_box(inner_box, outer_box):
-    inner_box = inner_box[:4] # extract only the first four elements
-    outer_box = outer_box[:4] # extract only the first four elements
+    inner_box = inner_box[:4]  # extract only the first four elements
+    outer_box = outer_box[:4]  # extract only the first four elements
     x1, y1, x2, y2 = map(int, inner_box)
     a1, b1, a2, b2 = map(int, outer_box)
-    print('checking if trigger is inside the paddle')
-    print('result:', (x1 > a1 and y1 > b1 and x2 < a2 and y2 < b2))
+
+    # Calculate the room allowance as 10% of the outer box dimensions
+    # room_x = (a2 - a1) * 0.1
+    # room_y = (b2 - b1) * 0.1
+
+    # print(inner_box)
+    # print(outer_box)
+    
+    # Adjust the inner box edges with the room allowance
+    # x1 -= room_x
+    # y1 -= room_y
+    # x2 += room_x
+    # y2 += room_y
+
+    print('Checking if trigger is inside the paddle')
+    print('Result:', (x1 > a1 and y1 > b1 and x2 < a2 and y2 < b2))
     return (x1 > a1 and y1 > b1 and x2 < a2 and y2 < b2)
+
 
 def avg_response_time(hits_array):
 
@@ -30,7 +45,7 @@ def best_response_time(hits_array):
     return min(hits_array)
 
 # Open video file
-video_path = Path('1.mp4').resolve()
+video_path = Path('../input_vids/3.mp4').resolve()
 if os.path.isfile(video_path):
 
     cap = cv2.VideoCapture(str(video_path))
@@ -42,7 +57,7 @@ if os.path.isfile(video_path):
 
     # Create output video writer
     fourcc = cv2.VideoWriter_fourcc(*'mp4v')
-    output_path = Path('output_res.mp4').resolve()
+    output_path = Path('../analyzed_vids/output_res.mp4').resolve()
     out = cv2.VideoWriter(str(output_path), fourcc, fps, (frame_width, frame_height))
 
     # set initial values for counters
@@ -60,7 +75,7 @@ if os.path.isfile(video_path):
     waiting_for_hit = False
 
     # Loop through video frames
-    while cap.isOpened() and frame_counter <= total_frames:
+    while cap.isOpened() and frame_counter <= 400:
         ret, frame = cap.read()
         if not ret:
             break
@@ -132,7 +147,8 @@ if os.path.isfile(video_path):
         if (hit_frame > trigger_frame and waiting_for_hit):
             hits_counter += 1
             print('hit nr', hits_counter)
-            frames_gap = (hit_frame - trigger_frame)  
+            frames_gap = (hit_frame - trigger_frame) 
+            hits_array.append(frames_gap/fps)
             waiting_for_hit = False
 
         # printing and debugging
@@ -161,7 +177,7 @@ if os.path.isfile(video_path):
         
         # Write frame to output video
         out.write(frame)
-
+        
         frame_counter += 1
 
     #end of while loop
@@ -175,11 +191,12 @@ if os.path.isfile(video_path):
     # print summary
     print("summary")
     print('Total hits:' ,hits_counter)
-    # print("avg hits")
-    # avg_time = avg_response_time(hits_array)
-    # print(f"The average response time was {avg_time:.2f} seconds")
-    # best_time = best_response_time(hits_array)
-    # print(f"The best response time was {best_time:.2f} seconds")
+    print(hits_array)
+    print("avg hits")
+    avg_time = avg_response_time(hits_array)
+    print(f"The average response time was {avg_time:.2f} seconds")
+    best_time = best_response_time(hits_array)
+    print(f"The best response time was {best_time:.2f} seconds")
 
     print('paddle position tracker array', distance_array)
 
