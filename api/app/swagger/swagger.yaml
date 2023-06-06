@@ -1,0 +1,89 @@
+openapi: 3.0.0
+info:
+  title: Ludus_res
+  description: Ludus CV response time analyzer
+  version: 3.0.0
+servers:
+- url: https://virtserver.swaggerhub.com/Adir667/Ludus-res/3.0.0
+  description: SwaggerHub API Auto Mocking
+- url: https://virtserver.swaggerhub.com/apis/Adir667/Ludus-res/3.0.0
+  description: SwaggerHub API Auto Mocking
+tags:
+- name: Response
+paths:
+  /response_time:
+    post:
+      tags:
+      - Response
+      description: Post a video
+      operationId: response_time_post
+      parameters:
+      - name: x_api_key
+        in: header
+        description: API Key
+        required: true
+        style: simple
+        explode: false
+        schema:
+          type: string
+      requestBody:
+        $ref: '#/components/requestBodies/VideoRequest'
+      responses:
+        "200":
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Analysis'
+        "400":
+          description: Bad request
+        "401":
+          description: API key is missing or invalid.
+      x-openapi-router-controller: swagger_server.controllers.response_controller
+components:
+  schemas:
+    Analysis:
+      type: object
+      properties:
+        fps:
+          type: number
+          format: float
+          example: 30
+        response_times:
+          $ref: '#/components/schemas/ResponseTimes'
+      example:
+        response_times:
+        - 0.874
+        - 0.874
+        fps: 30
+    ResponseTimes:
+      type: array
+      items:
+        type: number
+        format: float
+        example: 0.874
+  responses:
+    BadRequest:
+      description: Bad request
+    UnauthorizedError:
+      description: API key is missing or invalid.
+    NotFound:
+      description: Video not found
+  requestBodies:
+    VideoRequest:
+      content:
+        multipart/form-data:
+          schema:
+            required:
+            - video
+            type: object
+            properties:
+              video:
+                type: string
+                format: binary
+          encoding:
+            video:
+              contentType: "video/mp4,video/quicktime"
+              style: form
+      required: true
+

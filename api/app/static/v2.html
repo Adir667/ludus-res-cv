@@ -1,0 +1,133 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <title>Video Upload</title>
+    <style>
+        body {
+            text-align: center;
+            font-family: Arial, sans-serif;
+            margin-top: 50px;
+        }
+
+        h1 {
+            color: #333;
+        }
+
+        .container {
+            margin-top: 30px;
+        }
+
+        .input-group {
+            margin-bottom: 20px;
+        }
+
+        .btn {
+            padding: 10px 20px;
+            background-color: #4CAF50;
+            color: white;
+            border: none;
+            cursor: pointer;
+        }
+
+        .btn:hover {
+            background-color: #45a049;
+        }
+
+        .response {
+            margin-top: 20px;
+            text-align: left;
+        }
+    </style>
+    <script>
+        function handleFileUpload() {
+            var fileInput = document.getElementById('fileInput');
+            var file = fileInput.files[0];
+            var nameInput = document.getElementById('nameInput');
+            var name = nameInput.value;
+            var includeLink = document.getElementById('includeLink').checked;
+
+            if (file) {
+                // Print file size
+                var fileSize = file.size / 1024 / 1024; // in MB
+                document.getElementById('fileSize').textContent = 'File size: ' + fileSize.toFixed(2) + ' MB';
+
+                // Create multipart form data
+                var formData = new FormData();
+                formData.append('video', file);
+                formData.append('user_id', name);
+                formData.append('download', includeLink);
+
+                // Create headers
+                var headers = new Headers();
+
+                // Set Content-Type header for multipart form data
+                headers.append('Content-Type', 'multipart/form-data');
+                headers.append('x-api-key', 'mykey');
+                // Send file to API endpoint
+                fetch('http://localhost:5000/response_time', {
+                    method: 'POST',
+                    headers: headers,
+                    body: formData
+                })
+                    .then(function (response) {
+                        if (response.ok) {
+                            // Successful response
+                            return response.text();
+                        } else if (response.status === 400) {
+                            // Bad Request error
+                            return response.json(); // Parse the response body as JSON
+                        } else {
+                            // Other error
+                            throw new Error('Error: ' + response.status);
+                        }
+                    })
+                    .then(function (data) {
+                        // Handle the response data or error accordingly
+                        if (typeof data === 'object') {
+                            // Handle the 400 error response
+                            console.log('Bad Request:', data.error);
+                        } else {
+                            // Handle the successful response
+                            document.getElementById('response').textContent = data;
+                        }
+                    })
+                    .catch(function (error) {
+                        // Handle the network or other errors
+                        document.getElementById('response').textContent = error;
+                    });
+            document.getElementById('fileSize').textContent = 'No file selected.';
+            }
+        }
+
+    </script>
+</head>
+
+<body>
+    <h1>Video Upload</h1>
+    <div class="container">
+        <div class="input-group">
+            <label for="fileInput">Choose a video file:</label>
+            <input type="file" id="fileInput" accept="video/*">
+        </div>
+        <div class="input-group">
+            <label for="nameInput">Your Name:</label>
+            <input type="text" id="nameInput">
+        </div>
+        <div class="input-group">
+            <label>
+                <input type="radio" name="includeLink" id="includeLink" value="True" checked> Include download link
+            </label>
+            <label>
+                <input type="radio" name="includeLink" id="excludeLink" value="False"> Exclude download link
+            </label>
+        </div>
+        <div class="input-group">
+            <button class="btn" onclick="handleFileUpload()">Send Video</button>
+        </div>
+        <div id="fileSize"></div>
+        <div class="response" id="response"></div>
+    </div>
+</body>
+
+</html>
