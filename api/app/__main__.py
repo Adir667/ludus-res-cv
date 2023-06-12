@@ -1,12 +1,26 @@
-from flask import Flask, request, jsonify, make_response, url_for
-from services.video_service import is_video_file_format, save_video, analyze_video
-from config.api_config import validate_api_key
-from services.response_service import save_responses, avg_response_time, best_response_time
+from flask import Flask, request, jsonify, make_response, url_for, send_file
+from flask_swagger_ui import get_swaggerui_blueprint
+from app.services.video_service import is_video_file_format, save_video, analyze_video
+from app.config.api_config import validate_api_key
+from app.services.response_service import save_responses, avg_response_time, best_response_time
 import uuid
 import os
 from urllib.parse import quote
 
 app = Flask(__name__)
+
+#swagger configs
+SWAGGER_URL = '/swagger'  # URL for exposing Swagger UI (without trailing '/')
+API_URL = 'swagger.yaml'
+SWAGGER_BLUEPRINT = get_swaggerui_blueprint (
+    SWAGGER_URL,
+    API_URL,
+    config={
+        'app_name' : "Ludus"
+    }
+)
+
+app.register_blueprint(SWAGGER_BLUEPRINT, url_prefix = SWAGGER_URL)
 
 @app.route('/response_time', methods=['POST'])
 def response_time_post():
@@ -61,6 +75,7 @@ def response_time_post():
 
 @app.route('/download_file')
 def download_file():
+
     # Path to the file
     requested_file = request.args.get('filename')
     file_path = './output_vids/' + requested_file + '_analyzed.mp4'
@@ -84,6 +99,14 @@ def download_file():
 
     except FileNotFoundError:
         return 'File not found', 404
+
+@app.route('/upload')
+def upload_interface():
+    # Set the file path of the file to be sent
+    file_path = 'static/upload.html'
+    
+    # Send the file in the response
+    return send_file(file_path)
 
 if __name__ == '__main__':
     app.run()

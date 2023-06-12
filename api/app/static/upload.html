@@ -1,70 +1,216 @@
 <!DOCTYPE html>
 <html>
+
 <head>
-    <title>Upload Video</title>
-    <script>
-        function displayVideoDetails() {
-            var fileInput = document.getElementById("videoFile");
-            var fileSize = fileInput.files[0].size;
-            
-            var video = document.createElement("video");
-            video.preload = "metadata";
-            video.onloadedmetadata = function() {
-                var resolution = this.videoWidth + "x" + this.videoHeight;
-                var videoDetails = document.getElementById("videoDetails");
-                videoDetails.innerHTML = "File Size: " + fileSize + " bytes<br>Resolution: " + resolution;
-                
-                // Send API request to get estimated processing time
-                var url = "/estimate_processing_time";
-                var params = "resolution=" + resolution + "&fileSize=" + fileSize;
-                
-                fetch(url, {
-                    method: "POST",
-                    headers: {
-                        "Content-Type": "application/x-www-form-urlencoded"
-                    },
-                    body: params
-                })
-                .then(response => response.json())
-                .then(data => {
-                    console.log(response)
-                    var processingTime = data.processingTime;
-                    videoDetails.innerHTML += "<br>Estimated Processing Time: " + processingTime + " seconds";
-                })
-                .catch(error => {
-                    console.log("Error:", error);
-                });
-            };
-            video.src = URL.createObjectURL(fileInput.files[0]);
+    <title>File Upload and API Request</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            background-color: #f7f7f7;
+            margin: 0;
+            padding: 20px;
+            box-sizing: border-box;
         }
-        
-        function submitForm(event) {
-            event.preventDefault();
-            var form = document.getElementById("uploadForm");
-            var formData = new FormData(form);
-            
-            fetch(form.action, {
-                method: form.method,
+
+        h1 {
+            color: #333;
+            text-align: center;
+        }
+
+        .container {
+            max-width: 500px;
+            margin: 0 auto;
+            background-color: #fff;
+            border-radius: 5px;
+            padding: 20px;
+            box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+        }
+
+        .form-group {
+            margin-bottom: 20px;
+        }
+
+        .form-group label {
+            display: block;
+            font-size: 16px;
+            color: #333;
+            margin-bottom: 10px;
+        }
+
+        .form-group input[type="file"],
+        .form-group input[type="text"],
+        .form-group input[type="checkbox"] {
+            width: 100%;
+            padding: 10px;
+            border: 1px solid #ccc;
+            border-radius: 3px;
+        }
+
+        .form-group input[type="checkbox"] {
+            width: auto;
+            margin-left: 5px;
+        }
+
+        .button-container {
+            text-align: center;
+        }
+
+        .button-container button {
+            background-color: #3498db;
+            color: #fff;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 3px;
+            cursor: pointer;
+            font-size: 16px;
+            transition: background-color 0.3s ease;
+        }
+
+        .button-container button:hover {
+            background-color: #2980b9;
+        }
+
+        .response-container {
+            margin-top: 20px;
+            padding: 10px;
+            border: 1px solid #ccc;
+            border-radius: 5px;
+            background-color: #f7f7f7;
+        }
+
+        .response-item {
+            margin-bottom: 5px;
+            color: #333;
+        }
+
+        .download-link {
+            display: block;
+            margin-top: 10px;
+            color: #333;
+            text-decoration: underline;
+        }
+
+        .loader-container {
+            text-align: center;
+            margin-top: 20px;
+        }
+
+        .loader {
+            display: inline-block;
+            width: 40px;
+            height: 40px;
+            border: 4px solid #3498db;
+            border-radius: 50%;
+            border-top-color: #fff;
+            animation: spin 1s ease-in-out infinite;
+        }
+
+        @keyframes spin {
+            0% {
+                transform: rotate(0deg);
+            }
+
+            100% {
+                transform: rotate(360deg);
+            }
+        }
+    </style>
+</head>
+
+<body>
+    <div class="container">
+        <h1>File Upload and API Request</h1>
+        <div class="form-group">
+            <label for="file-input">Choose File:</label>
+            <input type="file" id="file-input" name="file">
+        </div>
+        <div class="form-group">
+            <label for="user-id-input">User ID:</label>
+            <input type="text" id="user-id-input" name="user_id">
+        </div>
+        <div class="form-group">
+            <label for="download-checkbox">Download Link:</label>
+            <input type="checkbox" id="download-checkbox" name="download">
+        </div>
+        <div class="button-container">
+            <button onclick="sendRequest()">Send</button>
+        </div>
+        <div id="loader-container" class="loader-container" style="display: none;">
+            <div id="loader" class="loader"></div>
+        </div>
+        <div id="response" class="response-container"></div>
+    </div>
+
+    <script>
+        function sendRequest() {
+            var form = document.getElementById("upload-form");
+            var formData = new FormData();
+
+            // Get the file input element
+            var fileInput = document.getElementById("file-input");
+            // Get the first file from the file input
+            var file = fileInput.files[0];
+            // Append the file to the form data
+            formData.append("video", file);
+
+            // Get the user ID input value
+            var userIdInput = document.getElementById("user-id-input");
+            var userId = userIdInput.value;
+            // Append the user ID to the form data
+            formData.append("user_id", userId);
+
+            // Get the checkbox element
+            var downloadCheckbox = document.getElementById("download-checkbox");
+            // Get the checkbox value as a boolean
+            var download = downloadCheckbox.checked;
+            // Append the checkbox value to the form data
+            formData.append("download", download);
+
+            var apiKey = "mykey"; // Replace with your actual API key
+
+            var loaderContainer = document.getElementById("loader-container");
+            var loader = document.getElementById("loader");
+            loaderContainer.style.display = "block";
+
+            fetch("http://localhost:5000/response_time", {
+                method: "POST",
+                headers: {
+                    "X-API-Key": apiKey
+                },
                 body: formData
             })
-            .then(response => response.json())
-            .then(data => {
-                var result = document.getElementById("uploadResult");
-                result.innerHTML = "Upload Result: " + data.message;
-            })
-            .catch(error => {
-                console.log("Error:", error);
-            });
+                .then(response => response.json())
+                .then(data => {
+                    var responseDiv = document.getElementById("response");
+                    responseDiv.innerHTML = "";
+                    for (var i = 0; i < data["Detected hits"].length; i++) {
+                        var responseItem = document.createElement("div");
+                        responseItem.className = "response-item";
+                        responseItem.textContent = "Hit " + (i + 1) + ": " + data["Detected hits"][i];
+                        responseDiv.appendChild(responseItem);
+                    }
+                    var avgItem = document.createElement("div");
+                    avgItem.className = "response-item";
+                    avgItem.textContent = "Average: " + data["avg"];
+                    responseDiv.appendChild(avgItem);
+                    var bestItem = document.createElement("div");
+                    bestItem.className = "response-item";
+                    bestItem.textContent = "Best: " + data["best"];
+                    responseDiv.appendChild(bestItem);
+                    var downloadLink = document.createElement("a");
+                    downloadLink.className = "download-link";
+                    downloadLink.href = data["download_link"];
+                    downloadLink.textContent = "Download Link";
+                    responseDiv.appendChild(downloadLink);
+
+                    loader.style.display = "none";
+                })
+                .catch(error => {
+                    console.error("Error:", error);
+                    loader.style.display = "none";
+                });
         }
     </script>
-</head>
-<body>
-    <h1>Upload Video</h1>
-    <form id="uploadForm" action="/dummy-data" method="POST" enctype="multipart/form-data" onsubmit="submitForm(event)">
-        <input type="file" id="videoFile" name="videoFile" onchange="displayVideoDetails()">
-        <button type="submit">Upload</button>
-    </form>
-    <div id="videoDetails"></div>
-    <div id="uploadResult"></div>
 </body>
+
 </html>

@@ -1,4 +1,4 @@
-from repositories.response_repository import save_responses_to_db
+from app.repositories.response_repository import save_responses_to_db
 import numpy as np
 
 def save_responses(user_id, video_id, responses_array):

@@ -4,7 +4,6 @@ import cv2
 from PIL import Image
 from pathlib import Path
 import torch
-import numpy as np
 
 save_input_directory = './input_vids/'
 save_output_directory = './output_vids/'
@@ -25,7 +24,6 @@ def save_video(video, new_video_name):
 
 def analyze_video(video_path, save):
 
-
     # Load YOLOv5 model
     model = torch.hub.load('ultralytics/yolov5', 'custom', path='./cv_models/best_trigger.pt')
 
@@ -35,6 +33,7 @@ def analyze_video(video_path, save):
     fps = int(cap.get(cv2.CAP_PROP_FPS))
     total_frames = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
 
+    #set_video_writer_output()
     if save:
         # Get video properties
         frame_width = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
@@ -59,15 +58,17 @@ def analyze_video(video_path, save):
     distance = 0
     hits_counter = 0
     hits_array = []
-    distance_array = []
     trigger_on = False
     looking_for_hit = False
     current_position = None
     max_waiting_frames = 45
     current_response = 0.000
+    paddle_min_confidence = 0.8
+    trigger_min_confidence = 0.6
+    min_frames_gap = 8
 
     # Loop through video frames
-    while cap.isOpened(): # and frame_counter <= 100:
+    while cap.isOpened() and frame_counter <= 200:
         ret, frame = cap.read()
         if not ret:
             break
@@ -86,33 +87,29 @@ def analyze_video(video_path, save):
             center_x = (x1 + x2) // 2
             center_y = (y1 + y2) // 2
 
-            #confidence
+            #position and confidence
             conf_array = conf.detach().cpu().numpy()
             confidence = conf_array[-2]
-
-            #print the position and the confidence for the detected object
             position_confidence = f'pos: {center_x}, {center_y}. conf: {confidence:.2f}'
-            # cv2.putText(frame, position_confidence, (x1, y1-40), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 0), 2)
 
             #paddle
-            if label == 'p' and confidence > 0.7:
-                cv2.rectangle(frame, (x1, y1), (x2, y2), (128, 0, 128), 2)
-                cv2.putText(frame, position_confidence, (x1, y1-10), cv2.FONT_HERSHEY_SIMPLEX, 0.6, (128, 0, 128), 2)
+            if label == 'p' and confidence > paddle_min_confidence:
+                if save:
+                    cv2.rectangle(frame, (x1, y1), (x2, y2), (128, 0, 128), 2)
+                    cv2.putText(frame, position_confidence, (x1, y1-10), cv2.FONT_HERSHEY_SIMPLEX, 0.6, (128, 0, 128), 2)
+                    # Draw a small red dot at the center of the paddle's bounding box
+                    cv2.circle(frame, (center_x, center_y), 6, (0, 0, 255), -1)
                 paddle_detected = True
                 paddle_box = box
-
-                # Draw a small red dot at the center of the paddle's bounding box
-                cv2.circle(frame, (center_x, center_y), 6, (0, 0, 255), -1)
                 
                 if prev_position is not None:
                     current_position = (center_x, center_y)
                     distance = abs(current_position[0] - prev_position[0])
                     print('distance difference for paddle:' ,distance)
-                    #add the distance travel to the array
-                    distance_array = np.append(distance_array, distance)
 
                     if distance > movement_threshold_for_hit:
-                        cv2.putText(frame, f"Movement: {distance} px!", (x1, y2+25), cv2.FONT_HERSHEY_SIMPLEX, 0.8, (0, 0, 255), 2)
+                        if save:
+                            cv2.putText(frame, f"Movement: {distance} px!", (x1, y2+25), cv2.FONT_HERSHEY_SIMPLEX, 0.8, (0, 0, 255), 2)
                         if looking_for_hit:
                             hit_frame = frame_counter
                 
@@ -120,17 +117,19 @@ def analyze_video(video_path, save):
                 prev_position = (center_x, center_y)
             
             #trigger
-            if label == 'a' and not trigger_on and confidence > 0.3:
+            if label == 'a' and not trigger_on and confidence > trigger_min_confidence:
                 if trigger_is_within_paddle(center_x, center_y, paddle_box):
-                    cv2.rectangle(frame, (x1, y1), (x2, y2), (0, 255, 0), 2)
-                    cv2.putText(frame, label, (x1, y1-10), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 0), 2)
-                    cv2.circle(frame, (center_x, center_y), 6, (0, 255, 0), 1)
+                    if save:
+                        cv2.rectangle(frame, (x1, y1), (x2, y2), (0, 255, 0), 2)
+                        cv2.putText(frame, label, (x1, y1-10), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 0), 2)
+                        cv2.circle(frame, (center_x, center_y), 6, (0, 255, 0), 1)
 
                     print('Detected trigger: ', position_confidence)
                     trigger_frame = frame_counter
                     trigger_on = True
                     looking_for_hit = True
 
+        #hit_analyzer(frame_counter, trigger_frame, max_waiting_frames, trigger_on, paddle_detected, looking_for_hit, min_frames_gap)
         # max wait time for hit            
         if frame_counter - trigger_frame > max_waiting_frames:
             trigger_on = False
@@ -142,41 +141,19 @@ def analyze_video(video_path, save):
 
         if (hit_frame > trigger_frame and looking_for_hit):
             frames_gap = (hit_frame - trigger_frame)
-            if frames_gap > 8: 
+            if frames_gap > min_frames_gap: 
                 hits_counter += 1
                 print('hit nr', hits_counter)
-                current_response = round(frames_gap / fps, 3)
+                current_response = round(frames_gap / fps, 2)
                 hits_array.append(current_response)
                 looking_for_hit = False
 
-        # printing and debugging
-        print('paddle found?:' ,paddle_detected)
-        print('trigger on?', trigger_on)
-        print('T frame:' , trigger_frame)
-        print('H frame:' , hit_frame)
-        print('---------------------')
+        # printing and debuging
+        debug_print(paddle_detected, trigger_on, trigger_frame, hit_frame)
 
         if save:
-            #write to the screen
-            fps_indicator = f'FPS: {fps:.2f}'
-            cv2.putText(frame, fps_indicator, (50, 50), cv2.FONT_HERSHEY_SIMPLEX, 0.8, (0, 0, 0), 4)
-            timestamp = f'Time: {frame_counter/fps:.3f}s'
-            cv2.putText(frame, timestamp, (50, 100), cv2.FONT_HERSHEY_SIMPLEX, 0.8, (0, 0, 0), 4)
-            frame_indicator = f'Frame nr: {frame_counter}'
-            cv2.putText(frame, frame_indicator, (50, 150), cv2.FONT_HERSHEY_SIMPLEX, 0.8, (0, 0, 0), 4)
-            trigger_frame_indicator = f'T frame: {trigger_frame}'
-            cv2.putText(frame, trigger_frame_indicator, (50, 200), cv2.FONT_HERSHEY_SIMPLEX, 0.8, (0, 0, 0), 4)
-            if trigger_frame > hit_frame:
-                hit_frame_indicator = 'H frame: waiting'
-            else:
-                hit_frame_indicator = f'H frame: {hit_frame}'
-            cv2.putText(frame, hit_frame_indicator, (50, 250), cv2.FONT_HERSHEY_SIMPLEX, 0.8, (0, 0, 0), 4)
-            response_time_indicator = f'Response: {current_response}s'
-            cv2.putText(frame, response_time_indicator, (50, 300), cv2.FONT_HERSHEY_SIMPLEX, 0.8, (0, 0, 0), 4)
-            
-            #Write frame to output video
-            out.write(frame)
-        
+            write_to_screen(frame, fps, frame_counter, trigger_frame, hit_frame, current_response, out)
+
         frame_counter += 1
 
     #end of while loop
@@ -185,10 +162,8 @@ def analyze_video(video_path, save):
     cap.release()
 
     # print summary
-    print("summary")
-    print('Total hits:' ,hits_counter)
-    print(hits_array)
-    
+    print_summary(hits_counter, hits_array)
+
     return hits_array
 
 def trigger_is_within_paddle(center_x, center_y, outer_box):
@@ -203,4 +178,40 @@ def trigger_is_within_paddle(center_x, center_y, outer_box):
     print('Result:', (a1 < center_x < a2) and (b1 < center_y < b2))
     return (a1 < center_x < a2) and (b1 < center_y < b2)
 
+def write_to_screen(frame, fps, frame_counter, trigger_frame, hit_frame, current_response, out):
+    #write to the screen
+    fps_indicator = f'FPS: {fps:.2f}'
+    cv2.putText(frame, fps_indicator, (50, 50), cv2.FONT_HERSHEY_SIMPLEX, 0.8, (0, 0, 0), 4)
+    timestamp = f'Time: {frame_counter/fps:.3f}s'
+    cv2.putText(frame, timestamp, (50, 100), cv2.FONT_HERSHEY_SIMPLEX, 0.8, (0, 0, 0), 4)
+    frame_indicator = f'Frame nr: {frame_counter}'
+    cv2.putText(frame, frame_indicator, (50, 150), cv2.FONT_HERSHEY_SIMPLEX, 0.8, (0, 0, 0), 4)
+    trigger_frame_indicator = f'T frame: {trigger_frame}'
+    cv2.putText(frame, trigger_frame_indicator, (50, 200), cv2.FONT_HERSHEY_SIMPLEX, 0.8, (0, 0, 0), 4)
+    if trigger_frame > hit_frame:
+        hit_frame_indicator = 'H frame: waiting'
+    else:
+        hit_frame_indicator = f'H frame: {hit_frame}'
+    cv2.putText(frame, hit_frame_indicator, (50, 250), cv2.FONT_HERSHEY_SIMPLEX, 0.8, (0, 0, 0), 4)
+    response_time_indicator = f'Response: {current_response}s'
+    cv2.putText(frame, response_time_indicator, (50, 300), cv2.FONT_HERSHEY_SIMPLEX, 0.8, (0, 0, 0), 4)
+    
+    #Write frame to output video
+    out.write(frame)
+
+def debug_print(paddle_detected, trigger_on, trigger_frame, hit_frame):
+
+    print('paddle found?:' ,paddle_detected)
+    print('trigger on?', trigger_on)
+    print('T frame:' , trigger_frame)
+    print('H frame:' , hit_frame)
+    print('---------------------')
+
+def print_summary(hits_counter, hits_array):
+
+    print("summary")
+    print('Total hits:' ,hits_counter)
+    print(hits_array)
+
+#hit_analyzer(frame_counter, trigger_frame, max_waiting_frames, trigger_on, paddle_detected, looking_for_hit, min_frames_gap)
 #1
