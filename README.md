@@ -16,7 +16,7 @@ You can use Roboflow's augmentation option to improve performance. The model pro
 
 The images and videos were taken by our team, and we split the dataset with a ratio of 70%, 18%, and 12% for training, validation, and testing, respectively.
 
-You can access the dataset here: https://app.swaggerhub.com/apis/Adir667/Ludus-res/3.0.0
+You can access the dataset here: https://app.roboflow.com/inh/trigger-0ubzh/7
 
 ## Model Training
 
@@ -25,6 +25,13 @@ To train the model, follow the instructions provided in the Model training Jupit
 ## API
 
 The API documentation for interacting with the model can be found here: https://app.swaggerhub.com/apis/Adir667/Ludus-res/3.0.0
+
+Source code can be found under /api folder.
+The API was built with Swagger and Flask framworks
+
+## Documents
+
+This repository also hold the official educational documentation of this project (TFGD and advisory reports). These can be found under /docs folder.
 
 
 ## License
