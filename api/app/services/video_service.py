@@ -68,7 +68,7 @@ def analyze_video(video_path, save):
     min_frames_gap = 8
 
     # Loop through video frames
-    while cap.isOpened() and frame_counter <= 200:
+    while cap.isOpened(): # and frame_counter <= 200:
         ret, frame = cap.read()
         if not ret:
             break
@@ -129,7 +129,6 @@ def analyze_video(video_path, save):
                     trigger_on = True
                     looking_for_hit = True
 
-        #hit_analyzer(frame_counter, trigger_frame, max_waiting_frames, trigger_on, paddle_detected, looking_for_hit, min_frames_gap)
         # max wait time for hit            
         if frame_counter - trigger_frame > max_waiting_frames:
             trigger_on = False
@@ -213,5 +212,4 @@ def print_summary(hits_counter, hits_array):
     print('Total hits:' ,hits_counter)
     print(hits_array)
 
-#hit_analyzer(frame_counter, trigger_frame, max_waiting_frames, trigger_on, paddle_detected, looking_for_hit, min_frames_gap)
 #1
